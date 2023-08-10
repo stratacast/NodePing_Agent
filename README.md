@@ -1,5 +1,22 @@
 # NodePing AGENT software
 
+## Fork Differences
+
+Intended to run with BSD. Namely, FreeBSD and OpenBSD. Still a work in progress. In the current state, this repo WILL run on OpenBSD and FreeBSD.
+
+The AGENT runs, but the checks are a WIP. Checks that will remain untested will be marked below, as I do not have a suitable environment to test them all.
+
+### Untested Checks
+
+If you wish to confirm a check is working that is listed here, please submit an issue and I will mark it as tested
+
+* MySQL
+* PostgreSQL
+* RDP
+* Redis
+* SIP
+* SNMP
+
 Software to run a **NodePing** AGENT check on Linux devices. It has been tested on Ubuntu and Raspian and requires node.js v10 or higher. It can optionally provide the diagnostics client if you'd like to run diagnostics from NodePing's UI or API on your AGENT.
 
 ## NodePing AGENT checks
