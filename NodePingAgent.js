@@ -376,7 +376,7 @@ var runCheck = function (checkinfo) {
     fs.access(checkpath+'.js', fs.constants.F_OK, function(err) {
         if (err) {
             console.log(new Date().toISOString(),'Error: NodePingAgent: No code available for check type:',checkinfo.type);
-            var resultobj = require('./checks/results.js');
+            var resultobj = require('__dirname/checks/results.js');
             var now = new Date().getTime();
             checkinfo.results = {start:now,end:now,runtime:0,success:false, statusCode:'error', message:'No code available on the AGENT for that check type'};
             resultobj.process(checkinfo);
@@ -388,7 +388,7 @@ var runCheck = function (checkinfo) {
                 check.check(checkinfo);
             } catch (bonk) {
                 console.log(new Date().toISOString(),'Error: NodePingAgent: Check ',checkinfo,' error: ',bonk);
-                var resultobj = require('./checks/results.js');
+                var resultobj = require('__dirname/checks/results.js');
                 var now = new Date().getTime();
                 checkinfo.results = {start:now,end:now,runtime:0,success:false, statusCode:'error', message:'Invalid check type'};
                 resultobj.process(checkinfo);

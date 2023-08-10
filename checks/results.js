@@ -293,7 +293,7 @@ function recheck(jobinfo){
         return true;
     } catch(bonk) {
         console.log(new Date(),'Error: NodePingAgent: Check ',jobinfo,' error: ',bonk);
-        var resultobj = require('./checks/results.js');
+        var resultobj = require('__dirname/checks/results.js');
         var now = new Date().getTime();
         jobinfo.results = {start:now,end:now,runtime:0,success:false, statusCode:'error', message:'Invalid check type'};
         resultobj.process(jobinfo);
