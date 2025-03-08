@@ -254,7 +254,7 @@ var check = function(jobinfo, retry){
             }
         }
 
-        targetinfo.agent = false;
+        targetoptions.timeout = timeout;
         debugMessage('info',"check_httpadv: targetoptions for "+jobinfo._id+": "+sys.inspect(targetoptions));
         debugMessage('info','check_httpadv: targetip is: '+sys.inspect(jobinfo.targetip));
         var killit = false;
@@ -456,7 +456,10 @@ var check = function(jobinfo, retry){
                                 req.abort();
                                 return check(jobinfo);
                             }
-                        } 
+                        } else if (!jobinfo.results.success) {
+                            resultobj.process(jobinfo);
+                            return false;
+                        }
                         // Check headers
                         if (receiveheaders) {
                             debugMessage('info',"check_httpadv: received headers: "+sys.inspect(res.headers));

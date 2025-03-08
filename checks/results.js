@@ -14,41 +14,12 @@ var sys = require("util"),
     path = require('path'),
     fs = require('fs'),
     os = require('os'),
-    nputil = require('..'+path.sep+'nputil');
+    nputil = require('..'+path.sep+'nputil'),
+    persist = require('..'+path.sep+'persist');
 
 var config = {
     data: require('..'+path.sep+'config.json'),
-    npconfig: require('..'+path.sep+'npconfig.json'),
-    checkdata: require('..'+path.sep+'checkdata.json'),
-    writingCheckConfig: false,
-    persistCheckData: function(retry) {
-        retry = retry || 0;
-        //console.log('Persisting check data to disk - retry = '+retry.toString());
-        if (config.writingCheckConfig) {
-            if (retry > 5) {
-                console.log('Already writing check data file - We retried 5 times. Giving up.');
-                return true;
-            } else {
-                retry++;
-                //console.log('Already writing check data file - retrying in 1.5 seconds. Retry = '+retry.toString());
-                return setTimeout(function(){
-                    return config.persistCheckData(retry);
-                },1500);
-            }
-        } 
-        config.writingCheckConfig = true;
-        var prettyjsoncheckdata = JSON.stringify(checkdata, null, 6);
-        //console.log('checkdata json:',prettyjsoncheckdata);
-        fs.writeFile(config.data.agent_path+path.sep+'checkdata.json', prettyjsoncheckdata, {encoding:'utf8',flag:'w'}, function(err) {
-            if (err) {
-                console.log('Check data write error:',err);
-            } else {
-                //console.log('Check data written');
-            }
-            config.writingCheckConfig = false;
-        });
-        return true;
-    }
+    npconfig: require('..'+path.sep+'npconfig.json')
 };
 
 exports.process = function(jobinfo, override) {
@@ -297,6 +268,7 @@ function recheck(jobinfo){
         var now = new Date().getTime();
         jobinfo.results = {start:now,end:now,runtime:0,success:false, statusCode:'error', message:'Invalid check type'};
         resultobj.process(jobinfo);
+        persist.addCheckdata(jobinfo);
         return true;
     }
     return true;
@@ -312,8 +284,9 @@ function rescheduleCheck(jobinfo) {
     jobinfo.runat = jobinfo.runat + (jobinfo.interval * 60000);
     var herenow = new Date().getTime();
     if (jobinfo.runat < herenow) {
-        jobinfo.runat = herenow - 5000;
+        jobinfo.runat = herenow;
     }
+    //jobinfo.runat = jobinfo.runat - 5000; // Sometimes 1-minute checks will get 'late' results.  This helps them run on time.
     console.log(new Date(),'Updating run at for',jobinfo._id, jobinfo.runat);
     jobinfo.retry = 0;
     jobinfo.state = (jobinfo.results.success) ? 1 : 0;
@@ -325,8 +298,8 @@ function rescheduleCheck(jobinfo) {
     if (!jobinfo.eventinfo) {
         jobinfo.eventinfo = {};
     }
-    config.checkdata[jobinfo._id] = jobinfo;
-    return config.persistCheckData();
+    persist.addCheckdata(jobinfo);
+    return true;
 }
 
 function postToResultsHandler(jobinfo, rh) {
@@ -373,10 +346,10 @@ function postToResultsHandler(jobinfo, rh) {
                 //var newnow = new Date().getTime();
                 //console.log(new Date(),'info',"Post to Resultshandler: runtime: "+rh.name+':'+sys.inspect(newnow - now));
                 if(body == '{"success":true}'){
-                    console.log(new Date(),'info',"results: received success from "+rh.name+": "+sys.inspect(jobinfo._id));
+                    console.log(new Date(),'info',"results: submitted results to "+rh.host+": "+sys.inspect(jobinfo._id));
                 }else{
                     // Bummer, we failed somehow.
-                    console.log(new Date(),'error',"results: Results handler "+rh.name+" error: "+sys.inspect(body));
+                    console.log(new Date(),'error',"results: Results handler "+rh.host+" error: "+sys.inspect(body));
                     if (body.indexOf('throttl') > -1 || body.indexOf('Check is not assigned') > -1) {
                         console.log(new Date(),'info',"Not retrying to submit results due to error type.");
                     } else {

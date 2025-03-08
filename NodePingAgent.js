@@ -27,6 +27,7 @@ var util = require('util'),
     disable = (process.argv[2] == 'disable') ? true : false,
     enable = (process.argv[2] == 'enable') ? true : false,
     remove = (process.argv[2] == 'remove') ? true : false,
+    persist = require('.'+path.sep+'persist'),
     checkoffset = 0,
     pluginsToRun = [],
     dataToReturn = {npcheckclock:{start:new Date().getTime()}},
@@ -45,10 +46,9 @@ process.on('SIGINT', function () {
 var config = {
     data: require('.'+path.sep+'config.json'),
     npconfig: require('.'+path.sep+'npconfig.json'),
-    checkdata: require('.'+path.sep+'checkdata.json'),
+    checkdata: persist.getCheckdata(),
     writingConfig: false,
     writingNpconfig: false,
-    writingCheckConfig: false,
     persistConfig: function(configData) {
         config.data = configData;
         if (config.writingConfig) {
@@ -58,13 +58,24 @@ var config = {
         console.log('Persisting config to disk.');
         config.writingConfig = true;
         var prettyjsonconfig = JSON.stringify(config.data, null, 6);
-        fs.writeFile(config.data.agent_path+path.sep+'config.json', prettyjsonconfig, {encoding:'utf8',flag:'w'}, function(err){
-            if (err) {
-                console.log('Config write error:',err);
-            } else {
-                console.log('Config data written');
+        fs.open(config.data.agent_path+path.sep+'config.json', 'w+', function(error,fd){
+            if (error) {
+                console.log('config.json open error:',error);
+                console.log('Unable to open config.json.  Please check file permissions.');
+                if (fd) {
+                    fs.close(fd, function(err){});
+                }
+                return false;
             }
-            config.writingConfig = false;
+            fs.write(fd, prettyjsonconfig, function(err, writtenbytes, unusedstring) {
+                if (err) {
+                    console.log('Config data write error:',err);
+                } else {
+                    console.log('Config data written');
+                }
+                fs.close(fd, function(err){});
+                config.writingConfig = false;
+            });
         });
         return true;
     },
@@ -77,39 +88,24 @@ var config = {
         console.log('Persisting npconfig to disk.');
         config.writingNpconfig = true;
         var prettyjsonconfig = JSON.stringify(config.npconfig, null, 6);
-        fs.writeFile(config.data.agent_path+path.sep+'npconfig.json', prettyjsonconfig, {encoding:'utf8',flag:'w'}, function(err){
-            if (err) {
-                console.log('Npconfig write error:',err);
-            } else {
-                console.log('Npconfig data written');
+        fs.open(config.data.agent_path+path.sep+'npconfig.json', 'w+', function(error,fd){
+            if (error) {
+                console.log('npconfig.json open error:',error);
+                console.log('Unable to open npconfig.json.  Please check file permissions.');
+                if (fd) {
+                    fs.close(fd, function(err){});
+                }
+                return false;
             }
-            config.writingNpconfig = false;
-        });
-        return true;
-    },
-    setCheckData: function(checks) {
-        if (checks) {
-            checkdata = checks;
-            return config.persistCheckData();
-        }
-        return false;
-    },
-    persistCheckData: function() {
-        console.log('Persisting check data to disk');
-        if (config.writingCheckConfig) {
-            console.log('Already writing check data file - giving up.');
-            return false;
-        }
-        config.writingCheckConfig = true;
-        var prettyjsoncheckdata = JSON.stringify(checkdata, null, 6);
-        //console.log('checkdata json:',prettyjsoncheckdata);
-        fs.writeFile(config.data.agent_path+path.sep+'checkdata.json', prettyjsoncheckdata, {encoding:'utf8',flag:'w'}, function(err) {
-            if (err) {
-                console.log('Check data write error:',err);
-            } else {
-                console.log('Check data written');
-            }
-            config.writingCheckConfig = false;
+            fs.write(fd, prettyjsonconfig, function(err, writtenbytes, unusedstring) {
+                if (err) {
+                    console.log('Npconfig data write error:',err);
+                } else {
+                    console.log('Npconfig data written');
+                }
+                fs.close(fd, function(err){});
+                config.writingNpconfig = false;
+            });
         });
         return true;
     }
@@ -150,7 +146,7 @@ var digestData = function() {
         return false;
     }
     // Send data to NodePing
-    console.log(new Date().toISOString(),'Info: NodePingAgent: offset for heartbeat:',heartbeatoffset);
+    console.log(new Date().toISOString(),'Info: NodePingAgent: Starting up: offset for heartbeat:',heartbeatoffset);
     setTimeout( function() {
         console.log(new Date().toISOString(),'Info: NodePingAgent: Sending heartbeat to NodePing:',dataToReturn);
         postHeartbeat(dataToReturn);
@@ -245,10 +241,11 @@ var postHeartbeat = function(data, retries) {
                             oldConfig = false;
                             body.checklist =  false;
                             // Save the new checklist
-                            config.setCheckData(config.checkdata);
+                            persist.setCheckdata(config.checkdata);
                             // Stagger the running of the checks evently over about 50 seconds minus the heartbeat offset
                             var checksToRunCount = checksToRun.length;
                             if (checksToRunCount) {
+                                persist.setNumChecksToRun(checksToRunCount);
                                 if (checksToRunCount > 500 || checksToRunCount < 5) {
                                     checkoffset = 0;
                                 } else {
@@ -263,6 +260,7 @@ var postHeartbeat = function(data, retries) {
                                     }
                                 });
                             }
+                            console.log(new Date().toISOString(),'Info: NodePingAgent: number of checks to run:',checksToRun.length, 'staggering checks',checkoffset,'ms');
                             processChecks();
                         }
                     } else {
@@ -365,7 +363,7 @@ var processChecks = function() {
             runCheck(check);
         }, checkoffset);
     } else {
-        console.log(new Date().toISOString(),'Info: NodePingAgent: finished running all checks.');
+        console.log(new Date().toISOString(),'Info: NodePingAgent: finished starting all checks.');
     }
     return true;
 };
